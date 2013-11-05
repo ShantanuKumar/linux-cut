@@ -1,12 +1,24 @@
-// Implements reduced version of linux command line tool cut
+// Implements reduced functionality version of linux command line tool cut
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <sstream>
 #include <vector>
+#include <cctype>
+#include <cstdlib>
 using namespace std;
 
-#define END -1
+#define END -2        // Dummy parameter to indicate the end of line in the file
+#define RES_OK 0      // Indicates arguments/inputs provided are correct
+#define BAD_INPUT -3 // Indicates arguments/inputs provided are incorrect
+
+/* Checks whether a string is a number or not */
+bool is_number (const string& s)
+{
+    string::const_iterator it = s.begin();
+    while ((it != s.end()) && isdigit(*it)) ++it;
+    return (!s.empty() && it == s.end());
+}
 
 /* Displaying the bytes based on the parameter bytepos */
 void readBytes(const string& fileName, const vector<int>& bytePos)
@@ -63,9 +75,10 @@ void readFields(const string& fileName,char delim , const vector<int>& fields)
             while(getline(line_stream,words,delim))
                 splitLine.push_back(words);
 
+            size_t splitSize = splitLine.size();
             if (line.find(delim) != string::npos)
             {
-                if (length == 1)
+                if ((length == 1) && ( fields[0] < splitSize))
                     cout << splitLine[fields[0]];
 
                 for(unsigned i = 0; i < length -1 ; ++i)
@@ -73,19 +86,28 @@ void readFields(const string& fileName,char delim , const vector<int>& fields)
                     if (fields[i+1] == END)
                     {
                         int j = fields[i];
-                        while (j < splitLine.size()-1 )
-                            cout << splitLine[j++] << delim;
+                        if (i==0)
+                            cout << splitLine[j++];
+                        while (j < splitSize-1 )
+                        {
+                            cout << delim << splitLine[j++];
+                        }
 
-                        if (j < splitLine.size())
-                            cout << splitLine[j];
+                        if (j < splitSize)
+                            cout << delim << splitLine[j];
                     }
                     else
                     {
-                        if(fields[i] < splitLine.size())
+                        if(fields[i] < splitSize)
                         {
-                            cout << splitLine[fields[i]] << delim;
-                            if ((i == (length - 2) ) && (fields[length -1] < splitLine.size()))
-                                cout << splitLine[fields[length -1]];
+                            if (i == 0)
+                                cout << splitLine[fields[i]];
+                            else
+                                cout << delim << splitLine[fields[i]];
+
+                            if ((i == (length - 2) ) && (fields[length -1] < splitSize))
+                                cout << delim << splitLine[fields[length -1]];
+
                         }
                     }
                 }
@@ -101,8 +123,9 @@ void readFields(const string& fileName,char delim , const vector<int>& fields)
 }
 
 /* Parsing commands line parameters to generate bytes/fields needed for the output */
-void parseParameters(const string& param, vector<int>& fields)
+int parseParameters(const string& param, vector<int>& fields)
 {
+    int res = RES_OK;
     istringstream param_stream(param);
     string split_param;
     char delimiter = ',';
@@ -111,37 +134,52 @@ void parseParameters(const string& param, vector<int>& fields)
         size_t pos = split_param.find("-");
         if ( pos != string::npos)
         {
-            if (split_param.length()==3)
+            string start_str = split_param.substr(0,pos);
+            string finish_str = split_param.substr(pos+1);
+            if (!start_str.empty() && !finish_str.empty())
             {
-                int start = split_param[0] - 49;
-                int finish = split_param[2] - 49;
+                if (!is_number(start_str) || !is_number(finish_str) )
+                {
+                    res = BAD_INPUT;
+                    return res;
+                }
+                int start = atoi(start_str.c_str()) - 1;
+                int finish = atoi(finish_str.c_str()) - 1;
+
                 while(start <= finish)
                 {
                     fields.push_back(start);
                     ++start;
                 }
             }
-            else if (split_param.length()==2)
+            else if ( start_str.empty() && !finish_str.empty())
             {
-                if (pos == 0)
+                if (!is_number(finish_str))
                 {
-                   int start = 0;
-                   int finish = split_param[1] - 49;
-                   while (start <= finish)
-                   {
-                       fields.push_back(start);
-                       ++start;
-                   }
+                    res = BAD_INPUT;;
+                    return res;
                 }
-                else
+                int start = 0;
+                int finish = atoi(finish_str.c_str()) -1;
+                while (start <= finish)
                 {
-                    int start = split_param[0] - 49;
-                    fields.push_back(start);
-                    int finish = END;
-                    fields.push_back(finish);
+                   fields.push_back(start);
+                   ++start;
                 }
             }
-            else
+            else if ( !start_str.empty() && finish_str.empty() )
+            {
+                if (!is_number(start_str))
+                {
+                    res = BAD_INPUT;
+                    return res;
+                }
+                int start = atoi(start_str.c_str()) - 1;
+                fields.push_back(start);
+                int finish = END;
+                fields.push_back(finish);
+            }
+            else if (start_str.empty() && finish_str.empty())
             {
                 int start = 0;
                 fields.push_back(start);
@@ -152,22 +190,39 @@ void parseParameters(const string& param, vector<int>& fields)
         }
         else
         {
-            int col = split_param[0] - 49;
+            if (!is_number(split_param))
+            {
+                res = BAD_INPUT;
+                return res;
+            }
+            int col = atoi(split_param.c_str()) - 1;
             fields.push_back(col);
         }
 
     }
+    return res;
 }
 
 /* Parsing commands line parameters to generate complements of bytes/fields needed for the output */
-void parseComplementParameters (const string& param, vector<int>& cmplmnt_fields)
+int parseComplementParameters (const string& param, vector<int>& cmplmnt_fields)
 {
+    int res = RES_OK;
     vector<int> fields;
-    parseParameters(param,fields);
+    res = parseParameters(param,fields);
+    if (res != RES_OK)
+        return res;
+
     size_t vectLength = fields.size();
 
     if (vectLength == 1)
     {
+        if (fields[0] != 0)
+        {
+            int start = 0;
+            int finish = fields[0] - 1;
+            while (start <= finish)
+                cmplmnt_fields.push_back(start++);
+        }
         cmplmnt_fields.push_back(fields[0]+1);
         cmplmnt_fields.push_back(END);
     }
@@ -182,6 +237,13 @@ void parseComplementParameters (const string& param, vector<int>& cmplmnt_fields
     {
         for(unsigned i = 0; i < vectLength-1; ++i)
         {
+            if ((i==0) && (fields[i] != 0))
+            {
+                int start = 0;
+                int finish = fields[i] - 1;
+                while(start <= finish)
+                    cmplmnt_fields.push_back(start++);
+            }
             if (fields[i+1] != END)
             {
                 int start = fields[i] + 1;
@@ -196,12 +258,12 @@ void parseComplementParameters (const string& param, vector<int>& cmplmnt_fields
             }
         }
     }
-
+    return res;
 }
 int main(int argc, char* argv[]) {
 
     try{
-
+        int res = RES_OK; // checks the correctness of provided input
         if (argc < 3)
         {
             cout<< "Insufficient number of arguments" << endl;
@@ -210,22 +272,21 @@ int main(int argc, char* argv[]) {
         {
             // Data file
             string fileName(argv[argc-1]);
-
             // Possible options
             string byte_option("-c");
             string delim_option("-d");
             string field_option("-f");
             string complement_option("--complement");
-            char delimiter = ';';       // Delimiter with default value of TAB
+            char delimiter = '\t';       // Delimiter with default value of TAB
             bool bComplement = false;   // Tracks whether we are looking for complement or not
             for(int i = 1; i < argc - 1; ++i)
             {
                 string arg = argv[i];
-
-                // Checking whether correct option has been provided or not
                 bool bIncorrect_opt = ((arg.find(byte_option)==string::npos) && (arg.find(delim_option)==string::npos)
                      && (arg.find(field_option)==string::npos) && (arg.find(complement_option)==string::npos));
-                if ((arg.length() < 3) || bIncorrect_opt)
+                size_t argLen = arg.length();
+
+                if ((argLen < 3) || bIncorrect_opt)
                 {
                     cout << "Bad input " << arg << endl;
                     break;
@@ -235,19 +296,36 @@ int main(int argc, char* argv[]) {
                 {
                     bComplement = true;
                 }
+
+                /* In case we try to take complement of whole of bytes or fields, which will be an empty output and hence we skip it */
+                bool wrong_complement_option = (bComplement && (arg.length() == 3) && (arg[argLen-1] == '-'));
+                bool wrong_complement_option_two = (bComplement && (arg.length()==4) && (arg.substr(2)== "1-"));
+                if (wrong_complement_option ||wrong_complement_option_two)
+                {
+                    cout << "Bad input for complement option " << arg << endl;
+                    break;
+                }
+
                 if (arg.compare(0,byte_option.size(),byte_option)==0)
                 {
                     size_t pos = arg.find(byte_option);
                     vector<int> bytePos;
                     if (!bComplement)
                     {
-                        parseParameters(arg.substr(pos+2),bytePos);
-                        readBytes(fileName,bytePos);
+                        res = parseParameters(arg.substr(pos+2),bytePos);
+
+                        if (res != BAD_INPUT)
+                            readBytes(fileName,bytePos);
+                        else
+                            cout << "Check the entered inputs" << endl;
                     }
-                    else if (arg[2] != '-')
+                    else
                     {
-                        parseComplementParameters(arg.substr(pos+2),bytePos);
-                        readBytes(fileName,bytePos);
+                        res = parseComplementParameters(arg.substr(pos+2),bytePos);
+                        if (res!= BAD_INPUT)
+                            readBytes(fileName,bytePos);
+                        else
+                            cout << "Check the entered inputs" << endl;
                     }
                 }
                 if (arg.compare(0,delim_option.size(),delim_option)==0)
@@ -260,16 +338,20 @@ int main(int argc, char* argv[]) {
                     vector<int> fields;
                     if(!bComplement)
                     {
-                        parseParameters(arg.substr(pos+2),fields);
-                        readFields(fileName,delimiter,fields);
+                        res = parseParameters(arg.substr(pos+2),fields);
+                        if (res != BAD_INPUT)
+                            readFields(fileName,delimiter,fields);
+                        else
+                            cout << "Check the entered inputs" << endl;
                     }
-
-                    else if (arg[2] != '-')
+                    else
                     {
-                        parseComplementParameters(arg.substr(pos+2),fields);
-                        readFields(fileName,delimiter,fields);
+                        res = parseComplementParameters(arg.substr(pos+2),fields);
+                        if (res != BAD_INPUT)
+                            readFields(fileName,delimiter,fields);
+                        else
+                            cout << "Check the entered inputs" << endl;
                     }
-
                 }
             }
         }
