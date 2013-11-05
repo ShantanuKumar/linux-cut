@@ -260,11 +260,33 @@ int parseComplementParameters (const string& param, vector<int>& cmplmnt_fields)
     }
     return res;
 }
+
+void help()
+{
+    cout << "SYNOPSIS" << endl;
+    cout << "\tcut -c list file" << endl;
+    cout << "\tcut -f list file" << endl;
+    cout << "\tcut -d delimiter -f or -c list file" << endl;
+    cout << "\tcut --complement -f or -c list file" << endl;
+    cout << endl;
+    cout << "USAGE" << endl;
+    cout << "\tOnly allowed options after cut are -c, -f, -d and --complement" << endl;
+    cout << "\tlist can be comma separated bytes or field position like 1,2,3 or 1-3,5- where - denotes the range " << endl;
+    cout << "\tThere is no space between options and list e.g -c1,2,3 or -c-1,4- , where options can be -c or -f "<<endl;
+    cout << "\tDelimiter is specified by -d and putting delimiter inside '' just after -d e.g. -d';', where ; is delimiter" <<endl;
+    cout << "\tFor complement -c or -f should appear after --complement" << endl;
+}
 int main(int argc, char* argv[]) {
 
     try{
         int res = RES_OK; // checks the correctness of provided input
-        if (argc < 3)
+        string arg_help = argv[1];
+        if (arg_help=="--help")
+        {
+            help();
+            return 0;
+        }
+        else if (argc < 3)
         {
             cout<< "Insufficient number of arguments" << endl;
         }
@@ -277,6 +299,7 @@ int main(int argc, char* argv[]) {
             string delim_option("-d");
             string field_option("-f");
             string complement_option("--complement");
+            string help_option("--help");
             char delimiter = '\t';       // Delimiter with default value of TAB
             bool bComplement = false;   // Tracks whether we are looking for complement or not
             for(int i = 1; i < argc - 1; ++i)
@@ -288,7 +311,7 @@ int main(int argc, char* argv[]) {
 
                 if ((argLen < 3) || bIncorrect_opt)
                 {
-                    cout << "Bad input " << arg << endl;
+                    cout << "Bad input size or options" << arg << endl;
                     break;
                 }
 
@@ -317,7 +340,7 @@ int main(int argc, char* argv[]) {
                         if (res != BAD_INPUT)
                             readBytes(fileName,bytePos);
                         else
-                            cout << "Check the entered inputs" << endl;
+                            cout << "Check the entered inputs, use --help option " << endl;
                     }
                     else
                     {
@@ -325,7 +348,7 @@ int main(int argc, char* argv[]) {
                         if (res!= BAD_INPUT)
                             readBytes(fileName,bytePos);
                         else
-                            cout << "Check the entered inputs" << endl;
+                            cout << "Check the entered inputs, use --help option" << endl;
                     }
                 }
                 if (arg.compare(0,delim_option.size(),delim_option)==0)
@@ -342,7 +365,7 @@ int main(int argc, char* argv[]) {
                         if (res != BAD_INPUT)
                             readFields(fileName,delimiter,fields);
                         else
-                            cout << "Check the entered inputs" << endl;
+                            cout << "Check the entered inputs, use --help option" << endl;
                     }
                     else
                     {
@@ -350,7 +373,7 @@ int main(int argc, char* argv[]) {
                         if (res != BAD_INPUT)
                             readFields(fileName,delimiter,fields);
                         else
-                            cout << "Check the entered inputs" << endl;
+                            cout << "Check the entered inputs, use --help option" << endl;
                     }
                 }
             }
