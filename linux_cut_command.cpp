@@ -84,7 +84,7 @@ void readFields(const string& fileName,char delim , const vector<int>& fields)
 
                 for(unsigned i = 0; i < length -1 ; ++i)
                 {
-                    /* Cases where we don't the know exact end field position of a line, we loop until the end of the line.
+                    /* Cases where we don't the exact end field position of a line, we loop until the end of the line.
                     Using END helps in those cases */
                     if (fields[i+1] == END)
                     {
@@ -128,15 +128,16 @@ void readFields(const string& fileName,char delim , const vector<int>& fields)
 }
 
 /* Parsing commands line parameters to generate bytes/fields needed for the output.
-    This is done by generating bytes/fields position from arguments like -3,8,9-*/
+    This is done by generating bytes/fields position from argument param like -3,8,9-*/
 int parseParameters(const string& param, vector<int>& fields)
 {
-    int res = RES_OK;
+    int res = RES_OK; // indicates validity of provided param structure
     istringstream param_stream(param);
-    string split_param;
-    char delimiter = ',';
+    char delimiter = ',';   // Delimiter which separates the position of bytes/fields
+    string split_param;     // Stores the field delimited by delimiter
 
-    /* Parsing arguments delimited by delimiter ',' e.g. 1-2,4,5 */
+
+    /* Parsing arguments delimited by , e.g. 1-2,4,5 */
     while(getline(param_stream,split_param,delimiter))
     {
         size_t pos = split_param.find("-");
@@ -218,11 +219,11 @@ int parseParameters(const string& param, vector<int>& fields)
     return res;
 }
 
-/* Parsing commands line parameters to generate complements of bytes/fields needed for the output */
+/* Parsing commands line parameters to generate complements of bytes/fields stored in param needed for the output */
 int parseComplementParameters (const string& param, vector<int>& cmplmnt_fields)
 {
-    int res = RES_OK;
-    vector<int> fields;
+    int res = RES_OK; // Indicates validity of param structure
+    vector<int> fields;  // Fields whose complement we need
     res = parseParameters(param,fields);
     if (res != RES_OK)
         return res;
@@ -313,7 +314,7 @@ int main(int argc, char* argv[]) {
         {
             // Data file
             string fileName(argv[argc-1]);
-            // Possible options that can be prp
+            // Possible options that can only be provided
             string byte_option("-c");
             string delim_option("-d");
             string field_option("-f");
@@ -323,6 +324,7 @@ int main(int argc, char* argv[]) {
             for(int i = 1; i < argc - 1; ++i)
             {
                 string arg = argv[i];
+                /* checks if only available options have been provided or not */
                 bool bIncorrect_opt = ((arg.find(byte_option)==string::npos) && (arg.find(delim_option)==string::npos)
                      && (arg.find(field_option)==string::npos) && (arg.find(complement_option)==string::npos));
                 size_t argLen = arg.length();
@@ -333,6 +335,7 @@ int main(int argc, char* argv[]) {
                     break;
                 }
 
+                /* --complement option */
                 if (arg.compare(0,complement_option.size(),complement_option)==0)
                 {
                     bComplement = true;
@@ -346,7 +349,7 @@ int main(int argc, char* argv[]) {
                     cout << "Bad input for complement option " << arg << endl;
                     break;
                 }
-
+                /* -c option */
                 if (arg.compare(0,byte_option.size(),byte_option)==0)
                 {
                     size_t pos = arg.find(byte_option);
@@ -368,10 +371,12 @@ int main(int argc, char* argv[]) {
                             cout << "Check the entered inputs, use --help option" << endl;
                     }
                 }
+                /* -d option */
                 if (arg.compare(0,delim_option.size(),delim_option)==0)
                 {
                     delimiter = arg[3];
                 }
+                /* -f option */
                 if (arg.compare(0,field_option.size(),field_option)==0)
                 {
                     size_t pos = arg.find(field_option);
