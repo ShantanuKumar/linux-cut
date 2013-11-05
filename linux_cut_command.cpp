@@ -84,7 +84,7 @@ void readFields(const string& fileName,char delim , const vector<int>& fields)
 
                 for(unsigned i = 0; i < length -1 ; ++i)
                 {
-                    /* Cases where we don't the exact end field position of a line, we loop until the end of the line.
+                    /* Cases where we don't the know exact end field position of a line, we loop until the end of the line.
                     Using END helps in those cases */
                     if (fields[i+1] == END)
                     {
@@ -136,7 +136,7 @@ int parseParameters(const string& param, vector<int>& fields)
     string split_param;
     char delimiter = ',';
 
-    /* Parsing arguments delimited by , e.g. 1-2,4,5 */
+    /* Parsing arguments delimited by delimiter ',' e.g. 1-2,4,5 */
     while(getline(param_stream,split_param,delimiter))
     {
         size_t pos = split_param.find("-");
