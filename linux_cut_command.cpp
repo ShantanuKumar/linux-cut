@@ -8,7 +8,7 @@
 #include <cstdlib>
 using namespace std;
 
-#define END -2        // Dummy parameter to indicate the end of line in the file
+#define END -2        // Dummy parameter to indicate the end of line in the file when we don't know exact location.
 #define RES_OK 0      // Indicates arguments/inputs provided are correct
 #define BAD_INPUT -3 // Indicates arguments/inputs provided are incorrect
 
@@ -72,6 +72,7 @@ void readFields(const string& fileName,char delim , const vector<int>& fields)
 
             istringstream line_stream(line);
             string words;
+            /* Separating fields based on provided delimiter and then storing them in a vector splitLine*/
             while(getline(line_stream,words,delim))
                 splitLine.push_back(words);
 
@@ -83,6 +84,8 @@ void readFields(const string& fileName,char delim , const vector<int>& fields)
 
                 for(unsigned i = 0; i < length -1 ; ++i)
                 {
+                    /* Cases where we don't the exact end field position of a line, we loop until the end of the line.
+                    Using END helps in those cases */
                     if (fields[i+1] == END)
                     {
                         int j = fields[i];
@@ -98,6 +101,7 @@ void readFields(const string& fileName,char delim , const vector<int>& fields)
                     }
                     else
                     {
+                        /* In this case we are aware of the last field we need to extract */
                         if(fields[i] < splitSize)
                         {
                             if (i == 0)
@@ -113,6 +117,7 @@ void readFields(const string& fileName,char delim , const vector<int>& fields)
                 }
                 cout << endl;
             }
+            /* In case delimiter isn't the right one, display whole line*/
             else cout << line << endl;
         }
     }
@@ -122,20 +127,26 @@ void readFields(const string& fileName,char delim , const vector<int>& fields)
     fileToRead.close();
 }
 
-/* Parsing commands line parameters to generate bytes/fields needed for the output */
+/* Parsing commands line parameters to generate bytes/fields needed for the output.
+    This is done by generating bytes/fields position from arguments like -3,8,9-*/
 int parseParameters(const string& param, vector<int>& fields)
 {
     int res = RES_OK;
     istringstream param_stream(param);
     string split_param;
     char delimiter = ',';
+
+    /* Parsing arguments delimited by , e.g. 1-2,4,5 */
     while(getline(param_stream,split_param,delimiter))
     {
         size_t pos = split_param.find("-");
         if ( pos != string::npos)
         {
+            /* Dividing string of the format 1-2 or -2 or 1- in start_str and finish_str, where - is used as separation */
             string start_str = split_param.substr(0,pos);
             string finish_str = split_param.substr(pos+1);
+
+            /* case1: where split_param is of type a-b*/
             if (!start_str.empty() && !finish_str.empty())
             {
                 if (!is_number(start_str) || !is_number(finish_str) )
@@ -152,6 +163,7 @@ int parseParameters(const string& param, vector<int>& fields)
                     ++start;
                 }
             }
+            /* case2: where split_param is of type -b */
             else if ( start_str.empty() && !finish_str.empty())
             {
                 if (!is_number(finish_str))
@@ -167,6 +179,7 @@ int parseParameters(const string& param, vector<int>& fields)
                    ++start;
                 }
             }
+            /* case3: where split_param is of type a- */
             else if ( !start_str.empty() && finish_str.empty() )
             {
                 if (!is_number(start_str))
@@ -179,6 +192,7 @@ int parseParameters(const string& param, vector<int>& fields)
                 int finish = END;
                 fields.push_back(finish);
             }
+            /* case4: where split param is just - */
             else if (start_str.empty() && finish_str.empty())
             {
                 int start = 0;
@@ -190,6 +204,7 @@ int parseParameters(const string& param, vector<int>& fields)
         }
         else
         {
+            /* For split_param which contains just a single digit */
             if (!is_number(split_param))
             {
                 res = BAD_INPUT;
@@ -214,6 +229,7 @@ int parseComplementParameters (const string& param, vector<int>& cmplmnt_fields)
 
     size_t vectLength = fields.size();
 
+    /* complement of a single field */
     if (vectLength == 1)
     {
         if (fields[0] != 0)
@@ -226,6 +242,7 @@ int parseComplementParameters (const string& param, vector<int>& cmplmnt_fields)
         cmplmnt_fields.push_back(fields[0]+1);
         cmplmnt_fields.push_back(END);
     }
+    /* complement for list like 3- after -c or -f options e.g. -c3- */
     else if ((vectLength == 2) && (fields[1] == END))
     {
         int start = 0;
@@ -235,6 +252,7 @@ int parseComplementParameters (const string& param, vector<int>& cmplmnt_fields)
     }
     else
     {
+        /* In rest of the cases, we try to generate all numbers between two non consecutive non negative positions.*/
         for(unsigned i = 0; i < vectLength-1; ++i)
         {
             if ((i==0) && (fields[i] != 0))
@@ -281,7 +299,8 @@ int main(int argc, char* argv[]) {
     try{
         int res = RES_OK; // checks the correctness of provided input
         string arg_help = argv[1];
-        if (arg_help=="--help")
+        string help_option("--help");
+        if (arg_help==help_option)
         {
             help();
             return 0;
@@ -294,12 +313,11 @@ int main(int argc, char* argv[]) {
         {
             // Data file
             string fileName(argv[argc-1]);
-            // Possible options
+            // Possible options that can be prp
             string byte_option("-c");
             string delim_option("-d");
             string field_option("-f");
             string complement_option("--complement");
-            string help_option("--help");
             char delimiter = '\t';       // Delimiter with default value of TAB
             bool bComplement = false;   // Tracks whether we are looking for complement or not
             for(int i = 1; i < argc - 1; ++i)
@@ -336,7 +354,6 @@ int main(int argc, char* argv[]) {
                     if (!bComplement)
                     {
                         res = parseParameters(arg.substr(pos+2),bytePos);
-
                         if (res != BAD_INPUT)
                             readBytes(fileName,bytePos);
                         else
