@@ -12,6 +12,13 @@ using namespace std;
 #define RES_OK 0      // Indicates arguments/inputs provided are correct
 #define BAD_INPUT -3 // Indicates arguments/inputs provided are incorrect
 
+// Possible options that can only be provided
+const string byte_option("-c");
+const string delim_option("-d");
+const string field_option("-f");
+const string complement_option("--complement");
+const char default_delimiter = '\t';
+
 /* Checks whether a string is a number or not */
 bool is_number (const string& s)
 {
@@ -20,6 +27,12 @@ bool is_number (const string& s)
     return (!s.empty() && it == s.end());
 }
 
+// Checks whether a file exists or not
+bool fexists(const string& filename)
+{
+  ifstream ifile(filename.c_str());
+  return ifile;
+}
 /* Displaying the bytes based on the parameter bytepos */
 void readBytes(const string& fileName, const vector<int>& bytePos)
 {
@@ -84,7 +97,7 @@ void readFields(const string& fileName,char delim , const vector<int>& fields)
 
                 for(unsigned i = 0; i < length -1 ; ++i)
                 {
-                    /* Cases where we don't the exact end field position of a line, we loop until the end of the line.
+                    /* Cases where we don't know the exact end field position of a line, we loop until the end of the line.
                     Using END helps in those cases */
                     if (fields[i+1] == END)
                     {
@@ -293,7 +306,6 @@ void help()
     cout << "\tlist can be comma separated bytes or field position like 1,2,3 or 1-3,5- where - denotes the range " << endl;
     cout << "\tThere is no space between options and list e.g -c1,2,3 or -c-1,4- , where options can be -c or -f "<<endl;
     cout << "\tDelimiter is specified by -d and putting delimiter inside '' just after -d e.g. -d';', where ; is delimiter" <<endl;
-    cout << "\tFor complement -c or -f should appear after --complement" << endl;
 }
 int main(int argc, char* argv[]) {
 
@@ -314,13 +326,17 @@ int main(int argc, char* argv[]) {
         {
             // Data file
             string fileName(argv[argc-1]);
-            // Possible options that can only be provided
-            string byte_option("-c");
-            string delim_option("-d");
-            string field_option("-f");
-            string complement_option("--complement");
-            char delimiter = '\t';       // Delimiter with default value of TAB
-            bool bComplement = false;   // Tracks whether we are looking for complement or not
+            if (!fexists(fileName))
+            {
+                cout << fileName << ": " << "No such file exists" << endl;
+                return 0;
+            }
+
+            string byteOption;                      // stores byte positions provided with -c option
+            string fieldOption;                     // stores field position provided with -f option
+            bool isComplementOption = false;        // Checks whether complement option --complement is provided or not
+            char delimiter = default_delimiter;      // Delimiter with default value of TAB
+
             for(int i = 1; i < argc - 1; ++i)
             {
                 string arg = argv[i];
@@ -329,75 +345,100 @@ int main(int argc, char* argv[]) {
                      && (arg.find(field_option)==string::npos) && (arg.find(complement_option)==string::npos));
                 size_t argLen = arg.length();
 
-                if ((argLen < 3) || bIncorrect_opt)
+                if (bIncorrect_opt)
                 {
-                    cout << "Bad input size or options" << arg << endl;
-                    break;
+                    cout << arg << ": Unavailable option"  << endl;
+                    cout << "Try 'cut --help' for more information" << endl;
+                    return 0;
                 }
-
                 /* --complement option */
                 if (arg.compare(0,complement_option.size(),complement_option)==0)
-                {
-                    bComplement = true;
-                }
+                    isComplementOption = true;
 
                 /* In case we try to take complement of whole of bytes or fields, which will be an empty output and hence we skip it */
-                bool wrong_complement_option = (bComplement && (arg.length() == 3) && (arg[argLen-1] == '-'));
-                bool wrong_complement_option_two = (bComplement && (arg.length()==4) && (arg.substr(2)== "1-"));
+                bool wrong_complement_option = (isComplementOption && (arg.length() == 3) && (arg[argLen-1] == '-'));
+                bool wrong_complement_option_two = (isComplementOption && (arg.length()==4) && (arg.substr(2)== "1-"));
                 if (wrong_complement_option ||wrong_complement_option_two)
                 {
                     cout << "Bad input for complement option " << arg << endl;
-                    break;
+                    return 0;
                 }
                 /* -c option */
                 if (arg.compare(0,byte_option.size(),byte_option)==0)
                 {
-                    size_t pos = arg.find(byte_option);
-                    vector<int> bytePos;
-                    if (!bComplement)
+                    if (argLen < 3)
                     {
-                        res = parseParameters(arg.substr(pos+2),bytePos);
-                        if (res != BAD_INPUT)
-                            readBytes(fileName,bytePos);
-                        else
-                            cout << "Check the entered inputs, use --help option " << endl;
+                        cout << arg << ": you must specify a list of bytes, characters, or fields" << endl;
+                        cout << "Try 'cut --help' for more information" << endl;
+                        return 0;
                     }
                     else
-                    {
-                        res = parseComplementParameters(arg.substr(pos+2),bytePos);
-                        if (res!= BAD_INPUT)
-                            readBytes(fileName,bytePos);
-                        else
-                            cout << "Check the entered inputs, use --help option" << endl;
-                    }
+                        byteOption = arg.substr(2);
                 }
+
+
                 /* -d option */
                 if (arg.compare(0,delim_option.size(),delim_option)==0)
                 {
-                    delimiter = arg[3];
+                    int pos1 = arg.find("'");
+                    int pos2 = arg.find("'",pos1+1);
+                    if ((pos1 == string::npos) || (pos2 ==string::npos))
+                    {
+                        cout << arg << ": Unspecified or wrongly specified delimiter" << endl;
+                        cout << "Try 'cut --help' for more information" << endl;
+                        return 0;
+                    }
+                    delimiter = arg[pos1+1];
                 }
+
                 /* -f option */
                 if (arg.compare(0,field_option.size(),field_option)==0)
                 {
-                    size_t pos = arg.find(field_option);
-                    vector<int> fields;
-                    if(!bComplement)
+                    if (argLen < 3)
                     {
-                        res = parseParameters(arg.substr(pos+2),fields);
-                        if (res != BAD_INPUT)
-                            readFields(fileName,delimiter,fields);
-                        else
-                            cout << "Check the entered inputs, use --help option" << endl;
+                        cout << arg << ": you must specify a list of bytes, characters, or fields" << endl;
+                        cout << "Try 'cut --help' for more information" << endl;
+                        return 0;
                     }
                     else
-                    {
-                        res = parseComplementParameters(arg.substr(pos+2),fields);
-                        if (res != BAD_INPUT)
-                            readFields(fileName,delimiter,fields);
-                        else
-                            cout << "Check the entered inputs, use --help option" << endl;
-                    }
+                        fieldOption = arg.substr(2);
                 }
+
+            }
+
+            if (!byteOption.empty() && !fieldOption.empty())
+            {
+                cout << "Only one type of option i.e. -c or -f should be specified, try 'cut --help' for more information" << endl;
+            }
+            else if(!byteOption.empty() && fieldOption.empty())
+            {
+                vector<int> bytePos;
+                if (!isComplementOption)
+                    res = parseParameters(byteOption,bytePos);
+                else
+                    res = parseComplementParameters(byteOption,bytePos);
+
+                if (res != BAD_INPUT)
+                    readBytes(fileName,bytePos);
+                else
+                    cout << "Check the entered inputs, try 'cut --help' for more information " << endl;
+            }
+            else if (byteOption.empty() && !fieldOption.empty())
+            {
+                vector<int> fields;
+                if(!isComplementOption)
+                    res = parseParameters(fieldOption,fields);
+                else
+                    res = parseComplementParameters(fieldOption,fields);
+
+                if (res != BAD_INPUT)
+                    readFields(fileName,delimiter,fields);
+                else
+                    cout << "Check the entered inputs, try 'cut --help' for more information " << endl;
+            }
+            else
+            {
+                cout << "One of -f or -c option should be provided, try 'cut --help' for more information " << endl;
             }
         }
     }
